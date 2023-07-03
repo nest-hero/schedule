@@ -1,52 +1,35 @@
 <p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /><a>
+  <img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" />
 </p>
 
-[travis-image]: https://api.travis-ci.org/nestjs/nest.svg?branch=master
-[travis-url]: https://travis-ci.org/nestjs/nest
-[linux-image]: https://img.shields.io/travis/nestjs/nest/master.svg?label=linux
-[linux-url]: https://travis-ci.org/nestjs/nest
+# What NestJS default Schedule module miss?
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore"><img src="https://img.shields.io/npm/dm/@nestjs/core.svg" alt="NPM Downloads" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#5" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec"><img src="https://img.shields.io/badge/Donate-PayPal-dc3d53.svg"/></a>
-  <a href="https://twitter.com/nestframework"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Horizontal Scale (multiple Nest instance)
+When we scale Nest in K8s or node cluster, `@Cron()` decorator will run many times since each Nest instance is isolated. 
+A Nest instance can not know did cron run in others instance or not? 
 
-## Description
+## Retry Mechanism
+If "every day cronjob" fails, we must wait a day for next cron. We better config `maxRetries` and `turnOffWhenMaxRetries`
 
-Schedule module for [Nest](https://github.com/nestjs/nest) based on the [cron](https://github.com/kelektiv/node-cron) package.
+## Logging and Metric
+Save cronjob history to show metric, how long does it take? how many times it retries and view history result to debug
 
-## Installation
+## Notification Alert
+Some important cronjob need to alert when fails but we can't check console log every times
 
-```bash
-$ npm install --save @nestjs/schedule
-$ npm install --save-dev @types/cron
+# Roadmap
+- [x] Horizontal Scale
+- [ ] Retry Mechanism
+- [ ] Logging and Metric
+- [ ] Notification Alert
+
+# Usage
+## Horizontal Scale (multiple Nest instance)
+We use a Redis key to mark a cronjob is running by a Nest instance. Redis atomic action behavior will make sure only 1 (random) instance can run a cronjob
+```typescript
+@Cron(CronExpression.EVERY_HOUR, {
+    name: 'redis_key',
+})
+handleCronEveryHour() {
+}
 ```
-
-## Quick Start
-
-[Overview & Tutorial](https://docs.nestjs.com/techniques/task-scheduling)
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](LICENSE).

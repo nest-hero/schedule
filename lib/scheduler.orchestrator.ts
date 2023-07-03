@@ -7,6 +7,7 @@ import { CronJob } from 'cron';
 import { v4 } from 'uuid';
 import { CronOptions } from './decorators/cron.decorator';
 import { SchedulerRegistry } from './scheduler.registry';
+import { RedisService } from './services/redis.service';
 
 type TargetHost = { target: Function };
 type TimeoutHost = { timeout: number };
@@ -22,12 +23,16 @@ type CronJobOptions = TargetHost & CronOptionsHost & RefHost<CronJob>;
 
 @Injectable()
 export class SchedulerOrchestrator
-  implements OnApplicationBootstrap, OnApplicationShutdown {
+  implements OnApplicationBootstrap, OnApplicationShutdown
+{
   private readonly cronJobs: Record<string, CronJobOptions> = {};
   private readonly timeouts: Record<string, TimeoutOptions> = {};
   private readonly intervals: Record<string, IntervalOptions> = {};
 
-  constructor(private readonly schedulerRegistry: SchedulerRegistry) {}
+  constructor(
+    private readonly schedulerRegistry: SchedulerRegistry,
+    private readonly redisService: RedisService,
+  ) {}
 
   onApplicationBootstrap() {
     this.mountTimeouts();
@@ -69,7 +74,18 @@ export class SchedulerOrchestrator
       const { options, target } = this.cronJobs[key];
       const cronJob = new CronJob(
         options.cronTime,
-        target as any,
+        async () => {
+          if (await this.redisService.isLocked(key)) {
+            return;
+          }
+
+          await this.redisService.lock(key);
+          try {
+            await target();
+          } finally {
+            await this.redisService.unlock(key);
+          }
+        },
         undefined,
         false,
         options.timeZone,
@@ -78,7 +94,7 @@ export class SchedulerOrchestrator
         options.utcOffset,
         options.unrefTimeout,
       );
-  
+
       if (options.disabled) {
         cronJob.stop();
       } else {
@@ -91,15 +107,15 @@ export class SchedulerOrchestrator
   }
 
   clearTimeouts() {
-    this.schedulerRegistry.getTimeouts().forEach((key) =>
-      this.schedulerRegistry.deleteTimeout(key),
-    );
+    this.schedulerRegistry
+      .getTimeouts()
+      .forEach((key) => this.schedulerRegistry.deleteTimeout(key));
   }
 
   clearIntervals() {
-    this.schedulerRegistry.getIntervals().forEach((key) =>
-      this.schedulerRegistry.deleteInterval(key),
-    );
+    this.schedulerRegistry
+      .getIntervals()
+      .forEach((key) => this.schedulerRegistry.deleteInterval(key));
   }
 
   closeCronJobs() {
